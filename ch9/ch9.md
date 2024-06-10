@@ -18,12 +18,11 @@ val readers = mutableListOf<String>()
 
 ```
 
-- 코틀린은 반드시 제네릭 타입의 타입 인자를 정의해야함.
+- 코틀린은 반드시 제네릭 타입의 타입 인자를 정의해야함.(개발자가 정의하던, 타입추론에 의해 정의되던)
 
 #### 제네릭 함수와 프로퍼티
-- 타입 인자를 명시적으로 표현해야 하지만, 대부분 컴파일러가 타입인자를 추론할 수 있음
+- 제네릭 함수를 호출할 땐, 타입 인자를 명시적으로 표현해야 하지만, 대부분 컴파일러가 타입인자를 추론할 수 있음
 
-제네릭 고차함수 호출하기
 ```kotlin
 
 val authors = listOf("Dmitry", "Svetlana")
@@ -31,9 +30,10 @@ val readers = mutableListOf<String>(/* ... */)
 fun <T> List<T>.filter(predicate: (T) -> Boolean): List<T>
 
 >>> readers.filter { it !in authors }
+>>> readers.filter<String> { it !in authors } //이렇게 명시해주지 않아도 됨
 
 ```
-- 위의 예시에서, it은 String이 됨.
+- 위의 예시에서, it은 String
 - 컴파일러는 제네릭 타입 T가 String이 된다는 사실을 추론함.
 
 #### 제너릭 클래스 선언
@@ -73,8 +73,7 @@ inferred type Any is not a subtype of Comparable<Any>
 
 - 타입 파라미터 제약이 둘 이상인 경우
     - 두 개 이상의 제약을 두어야 하는 경우도 있음.
-    - 타입 인자가 CharSequence와 Appendable 인터페이스를 둘 다 구현해야 함.
-    - 이 말은 data를 접근하는 연산자와 데이터를 변경하는 연산자가 모두 사용 가능한 타입이어야 한다는 것.
+
 
   ```kotlin
   fun <T> ensureTrailingPeriod(seq: T)
@@ -88,11 +87,20 @@ inferred type Any is not a subtype of Comparable<Any>
     >>> println(helloWorld)
     Hello World.
   ```
-
+- 타입 인자가 CharSequence와 Appendable 인터페이스를 둘 다 구현해야 함.
+- data를 접근하는 연산자와 데이터를 변경하는 연산자가 모두 사용 가능한 타입이어야 한다는 것.
 
 #### 타입 파라미터를 널이 될 수 없는 타입으로 한정
 - 타입 상한을 정하지 않은 타입 파라미터는 결과적으로 Any?를 상한으로 정한 파라미터와 같음.
 - 만약 타입 파라미터를 널이 될 수 없는 값으로 한정하고 싶다면, 상한을 Any로 사용.
+
+```kotlin
+class Processor<T> { //T뒤에 ?가 붙지는 않지만, value는 null이 될 수 있음
+	fun process(value: T) { 
+		value?.hashCode()
+	}
+}
+```
 
 ### 런타임 시 제네릭스의 동작 : 소거된 타입 파라미터와 실체화된 타입 파라미터
 - JVM의 제네릭스는 보통 타입 소거를 사용해 구현됨
@@ -115,11 +123,12 @@ ERROR: Cannot check for instance of erased type
 - 저장해야하는 타입 정보의 크기가 줄어들어서 전반적인 메모리의 사용량이 줄어듦
 - 타입 인자를 명시하지않고 제네릭 타입을 사용할 수 없음 -> 스타프로젝션 사용
 ```kotlin
-if (value is List<*>) { ... }
+if (value is List<*>) { ... }   //map,set...등이 아니라 List 인 것을 확인하기 
 ```
 - 타입 파라미터가 2개 이상이면 모든 타입 파라미터에 *를 포함시켜야함.
 - 인자를 알 수 없는 제네릭 타입을 표현할 때 스타프로젝션을 사용함.
 - as나 as? 캐스팅에도 제네릭 타입을 사용할 수 있다.
+
 ```kotlin
 fun printSum(c: Collection<*>) {
 val intList = c as? List<Int>
@@ -130,8 +139,8 @@ println(intList.sum())
 6
 
 //------------------------------------
-fun printSum(c: Collection<Int>) {
-    if (c is List<Int>) {
+fun printSum(c: Collection<Int>) { 
+    if (c is List<Int>) { //컴파일 시점에 타입 정보가 주어지면 is 검사 수행 가능
         println(c.sum())
     }
 }
@@ -139,7 +148,6 @@ fun printSum(c: Collection<Int>) {
 6
 
 ```
-- 컴파일 시점에 타입 정보가 주어지면 is 검사 수행 가능
 
 #### 실체화한 타입 파라미터를 사용한 함수 선언
 - 제네릭 함수의 타입 인자도 호출 시 쓰인 타입인자를 알 수 없음.
@@ -206,9 +214,9 @@ inline fun <reified T> loadService() { //타입 파라미터를 "reified"로 표
 
 #### 공변성 : 하위 타입 관계 유지
 - 클래스의 타입 파라미터를 공변적으로 만들면 함수 정의에 사용한 파라미터 타입과 타입 인자의 타입이 정확히 일치하지 않더라도 그 클래스의 인스턴스를 함수 인자나 반환값으로 사용할 수 있음.
-- 클래스 멤버를 선언할 때 타입 파라미터를 사용할 수 있는 지점은 모두 인(in)과 아웃(out)위치로 나뉜다. 만약 T가 함수의 반환 타입에 쓰인다면 T는 아웃 위치에 있다.
-    - 그 함수는 T 타입의 값을 생산
-    - T가 함수의 파라미터 타입에 쓰인다면 T는 인 위치에 있음
+- 클래스 멤버를 선언할 때 타입 파라미터를 사용할 수 있는 지점은 모두 인(in)과 아웃(out)위치로 나뉜다. 
+  - 만약 T가 함수의 반환 타입에 쓰인다면 T는 아웃 위치에 있다.(그 함수는 T 타입의 값을 생산)
+  - T가 함수의 파라미터 타입에 쓰인다면 T는 인 위치에 있음
 
 
 #### 반공변 : 뒤집힌 하위 타입 관계
@@ -216,6 +224,10 @@ inline fun <reified T> loadService() { //타입 파라미터를 "reified"로 표
 - Consumer<>T를 예로 들어 설명하자면,
   - 타입 B가 타입 A의 하위 타입인 경우 Consumer<>A가 Consumer<>B의 하위 타입인 관계가 성립하면 제네릭 클래스 Consumer<>T는 타입 인자 T에 대해 반공변이다.
 
+#### in, out 위치 
+- 공변성일 때 : T를 out 위치에만 사용가능(반환 타입에서만 사용)
+- 반공변성 일 때 : T를 in 위치에서만 사용 가능(파라미터 위치에만 사용)
+- 무공변일때 : T를 아무데나 사용 가능
 
 #### 스타 프로젝션 : 타입 인자 대신 * 사용
 - 제네릭 타입 인자 정보가 없음을 표현하기 위해 스타프로젝션을 사용함
